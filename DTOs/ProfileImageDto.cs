@@ -10,7 +10,7 @@ namespace MyWebAppApi.DTOs
         [FileSize(2 * 1024 * 1024)]
         public IFormFile File { get; set; } = null!;
 
-        public string? ExisngImagePath { get; set; }
+        public string? ExistingImagePath { get; set; }
 
     }
 }

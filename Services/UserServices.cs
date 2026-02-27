@@ -218,7 +218,7 @@ namespace MyWebAppApi.Services
             var imagePath = await _userRepository.GetImagePath(id);
             _logger.LogInformation("User profile image retrived successfully");
 
-            return ApiResponseBuilder.Success(new ProfileImageDto { ExisngImagePath = imagePath });
+            return ApiResponseBuilder.Success(new ProfileImageDto { ExistingImagePath = imagePath });
 
         }
 
