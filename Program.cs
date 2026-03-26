@@ -1,3 +1,7 @@
+using Microsoft.Extensions.FileProviders;
+using MvcApp.Hubs;
+using MvcApp.Services;
+using MvcApp.Services.Interfaces;
 using MyWebAppApi.Extensions;
 using MyWebAppApi.Helper;
 using MyWebAppApi.Middlewares;
@@ -10,6 +14,16 @@ using Serilog.Events;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowSpecificOrigins", policy =>
+    {
+        policy.WithOrigins("http://localhost:8080") 
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
+    });
+});
 
 builder.Services.AddControllers();
 
@@ -20,13 +34,17 @@ builder.Services.AddSwaggerWithJwt();
 
 
 builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IChatRepository, ChatRepository>();
 builder.Services.AddScoped<IUserServices, UserServices>();
 builder.Services.AddScoped<IJwtHelper,JwtHelper>();
 builder.Services.AddScoped<IUserFinder, UserFinder>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IAdminService, AdminService>();
+builder.Services.AddScoped<IChatServices, ChatServices>();
 
-
+builder.Services.AddSignalR(options => {
+    options.EnableDetailedErrors = true;
+});
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Information()
     .MinimumLevel.Override("Microsoft",LogEventLevel.Warning)
@@ -53,6 +71,12 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+
+app.UseCors("AllowSpecificOrigins");
+
+app.UseStaticFiles();
+
+
 app.UseExceptionMiddleware();
 app.UseSerilogRequestLogging();
 
@@ -60,10 +84,12 @@ app.UseHttpsRedirection();
 app.UseStaticFiles();
 
 
+app.UseAuthentication();
 app.UseAuthorization();
 app.UseUserIdMiddleware();
 
 
+app.MapHub<ChatHub>("/chatHub");
 
 app.MapControllers();
 

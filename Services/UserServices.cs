@@ -85,17 +85,42 @@ namespace MyWebAppApi.Services
 
         public async Task<ApiResponse<AuthResponseDto>> LoginUser(LoginRequestDto dto)
         {
+            var isLocked = await _userRepository.LockedOrNot(dto.UserName);
+
+            if (isLocked)
+            {
+                _logger.LogWarning("Login failed: User {UserName} account no longer exist.", dto.UserName);
+                return ApiResponseBuilder.Fail<AuthResponseDto>("Account no longer exist", 401);
+            }
+
             var user = await _userRepository.GetUserByUsername(dto.UserName);
 
             if (user == null)
             {
-                _logger.LogWarning("Login failed: User {UserName} not found.", dto.UserName);
+                _logger.LogWarning("Login failed: User {UserName} not found or account no longer exist.", dto.UserName);
                 return ApiResponseBuilder.Fail<AuthResponseDto>("Invalid Credentials", 401);
             }
 
             if (!BCrypt.Net.BCrypt.Verify(dto.Password, user.HashedPassword))
             {
                 _logger.LogWarning("Login failed: Invalid password for {UserName}.", dto.UserName);
+
+                var tooManyAttempts = user.LoginAttempts >= 3;
+
+                if (tooManyAttempts)
+                {
+                    await _userRepository.LockUser(user.Id);
+
+                    _logger.LogWarning(
+                        "Login failed: More than 3 login attempts for {UserName}. Account has been deactivated.",
+                        dto.UserName);
+
+                    return ApiResponseBuilder.Fail<AuthResponseDto>("Access restricted", 401);
+                }
+
+                await _userRepository.SaveLoginAttempt(user.Id);
+
+
                 return ApiResponseBuilder.Fail<AuthResponseDto>("Invalid Credentials", 401);
             }
 
@@ -108,7 +133,7 @@ namespace MyWebAppApi.Services
             _logger.LogInformation("User {UserId} logged in successfully.", user.Id);
 
 
-            return ApiResponseBuilder.Success<AuthResponseDto>(new AuthResponseDto { Id=user.Id,Token=token,IsAdmin=isAdmin}, "Login Successful");
+            return ApiResponseBuilder.Success<AuthResponseDto>(new AuthResponseDto { Id=user.Id,Token=token,IsAdmin=isAdmin,UserName = user.UserName}, "Login Successful");
         }
 
 

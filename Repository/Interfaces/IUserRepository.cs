@@ -18,6 +18,13 @@ namespace MyWebAppApi.Repository.Interfaces
         Task<IEnumerable<UsersViewDto>> GetAllUsers();
         Task<string?> GetImagePath(int id);
         Task<DbResponse?> DeleteUser(int id);
+
+        Task<bool> LockUser(int id);
+        Task<bool> LockedOrNot(string username);
+
+        Task SaveLoginAttempt(int id);
+
+        Task<bool> ToaggleStatus(int id);
     }
 
 }

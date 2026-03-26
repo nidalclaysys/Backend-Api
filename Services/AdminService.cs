@@ -54,5 +54,22 @@ namespace MyWebAppApi.Services
             _logger.LogError("operatin failed for user {userId}",id);
             return ApiResponseBuilder.Fail<string>(result.Message ?? "Operation Failed",500);
         }
+
+       public async Task<ApiResponse<string>> ToaggleUserStatus(int id)
+       {
+            _logger.LogInformation("Fetching AllUsers data");
+
+            var role = _userFinder.GetRole();
+
+            if (role != "Admin")
+            {
+                _logger.LogWarning("Autharization revoked! for {role}", role);
+                return ApiResponseBuilder.Fail<string>("Forbidden", 403);
+            }
+
+            var res = await _userRepository.ToaggleStatus(id);
+
+            return res ? ApiResponseBuilder.Success<string>(null!,"Staus Updated Successfully") : ApiResponseBuilder.Fail<string>("Status Update Failed", 500);
+        }
     }
 }

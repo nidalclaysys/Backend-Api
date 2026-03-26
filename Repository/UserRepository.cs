@@ -1,11 +1,12 @@
-﻿using Microsoft.Data.SqlClient;
+﻿using System.Data;
+using System.Diagnostics;
+using System.Net;
+using System.Reflection.PortableExecutable;
+using Microsoft.Data.SqlClient;
 using MyApp.Models;
 using MyWebApp.Models;
 using MyWebAppApi.DTOs;
 using MyWebAppApi.Repository.Interfaces;
-using System.Data;
-using System.Diagnostics;
-using System.Net;
 
 namespace MyWebAppApi.Repository
 {
@@ -33,7 +34,7 @@ namespace MyWebAppApi.Repository
                 new SqlParameter("@mobile", string.IsNullOrEmpty(dto.Mobile) ? (object)DBNull.Value : dto.Phone)
             };
 
-            SqlDataReader reader = await ExecuteSp("auth.register_user", parameters);
+            SqlDataReader reader = await ExecuteSp("Auth.RegisterUser", parameters);
 
             if(await reader.ReadAsync())
             {
@@ -47,15 +48,33 @@ namespace MyWebAppApi.Repository
 
         }
 
+        public async Task<bool> LockedOrNot(string username)
+        {
+            const string sql = @"
+        SELECT 1 
+        FROM Auth.Credentials 
+        WHERE Username = @username 
+          AND  IsDelete = 1;";
+
+            await using var conn = GetConnection();
+            await using var cmd = new SqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("@username", username);
+
+            await conn.OpenAsync();
+            var result = await cmd.ExecuteScalarAsync();
+
+            return result != null;
+        }
+
+
         public async Task<Credential?> GetUserByUsername(string username)
         {
-            string sql = "SELECT id,username,hashed_password,role FROM auth.credentials WHERE username = @username;";
+            string sql = "SELECT Id,Username,HashedPassword,Role,LoginAttempts FROM Auth.Credentials WHERE Username = @username AND (IsActive = 1 AND IsDelete = 0 );";
             await using var conn = GetConnection();
 
             await using SqlCommand cmd = new SqlCommand(sql, conn);
 
             Credential credential = new Credential();
-
             cmd.Parameters.AddWithValue("@username", username);
 
             await conn.OpenAsync();
@@ -66,11 +85,16 @@ namespace MyWebAppApi.Repository
 
             if (!await read.ReadAsync()) return null;
          
-                credential.Id = Convert.ToInt32(read["id"]);
-                credential.UserName = Convert.ToString(read["username"]) ?? "";
-                credential.HashedPassword = Convert.ToString(read["hashed_password"]) ?? "";
-                credential.Role = Convert.ToString(read["role"]);
+                credential.Id = Convert.ToInt32(read["Id"]);
+                credential.UserName = Convert.ToString(read["Username"]) ?? "";
+                credential.HashedPassword = Convert.ToString(read["HashedPassword"]) ?? "";
+                credential.Role = Convert.ToString(read["Role"]);
 
+                int loginAttemptsOrdinal = read.GetOrdinal("LoginAttempts");
+
+                credential.LoginAttempts = !read.IsDBNull(loginAttemptsOrdinal)
+                                 ? Convert.ToInt32(read.GetValue(loginAttemptsOrdinal))
+                                 : 0;
             return credential;
 
         }
@@ -81,7 +105,7 @@ namespace MyWebAppApi.Repository
 
             DateTime now = DateTime.Now;
 
-            string sql = "UPDATE auth.credentials SET login_at = @now WHERE id = @id;";
+            string sql = "UPDATE Auth.Credentials SET LoginAt = @now ,LoginAttempts = 0  WHERE Id = @id;";
 
             using (SqlCommand cmd = new SqlCommand(sql, conn))
             {
@@ -99,7 +123,7 @@ namespace MyWebAppApi.Repository
         {
             await using var conn = GetConnection();
 
-            string sql = "SELECT * FROM app.users WHERE user_id = @id;";
+            string sql = "SELECT * FROM App.Users WHERE UserId = @id;";
 
             using (SqlCommand cmd = new SqlCommand(sql, conn))
             {
@@ -113,19 +137,20 @@ namespace MyWebAppApi.Repository
 
                 return new Users
                 {
-                    FirstName = Convert.ToString(read["first_name"]),
-                    LastName = Convert.ToString(read["last_name"]),
-                    DisplayName = read["display_name"] == DBNull.Value ? null : Convert.ToString(read["display_name"]),
-                    DateOfBirth = Convert.ToDateTime(read["date_of_birth"]),
-                    Gender = Convert.ToBoolean(read["gender"]),
-                    Age = Convert.ToInt32(read["age"]),
-                    Address = Convert.ToString(read["address"]),
-                    City = read["city"] == DBNull.Value ? null : Convert.ToString(read["city"]),
-                    State = read["state"] == DBNull.Value ? null : Convert.ToString(read["state"]),
-                    ZipCode = Convert.ToInt32(read["zipcode"]),
-                    Phone = Convert.ToString(read["phone"]),
-                    Mobile = read["mobile"] == DBNull.Value ? null : Convert.ToString(read["mobile"]),
-                    ProfileImagePath = read["profile_image_path"] == DBNull.Value ? null : Convert.ToString(read["profile_image_path"])
+                    Id = id,
+                    FirstName = Convert.ToString(read["FirstName"]),
+                    LastName = Convert.ToString(read["LastName"]),
+                    DisplayName = read["DisplayName"] == DBNull.Value ? null : Convert.ToString(read["DisplayName"]),
+                    DateOfBirth = Convert.ToDateTime(read["DOB"]),
+                    Gender = Convert.ToBoolean(read["Gender"]),
+                    Age = Convert.ToInt32(read["Age"]),
+                    Address = Convert.ToString(read["Address"]),
+                    City = read["City"] == DBNull.Value ? null : Convert.ToString(read["City"]),
+                    State = read["State"] == DBNull.Value ? null : Convert.ToString(read["State"]),
+                    ZipCode = Convert.ToInt32(read["Zipcode"]),
+                    Phone = Convert.ToString(read["Phone"]),
+                    Mobile = read["Mobile"] == DBNull.Value ? null : Convert.ToString(read["Mobile"]),
+                    ProfileImagePath = read["ProfileImagePath"] == DBNull.Value ? null : Convert.ToString(read["ProfileImagePath"])
                 };
 
             }
@@ -152,7 +177,7 @@ namespace MyWebAppApi.Repository
 
             };
 
-            var read = await ExecuteSp("app.profile_update",paramiters);
+            var read = await ExecuteSp("App.ProfileUpdate",paramiters);
 
             await read.ReadAsync();
 
@@ -166,7 +191,7 @@ namespace MyWebAppApi.Repository
 
         public async Task<string?> GetPasswordById(int id)
         {
-            string sql = "SELECT hashed_password FROM auth.credentials WHERE id = @id;";
+            string sql = "SELECT HashedPassword FROM Auth.Credentials WHERE Id = @id;";
             await using var conn = GetConnection();
 
             await using SqlCommand cmd = new SqlCommand(sql, conn);
@@ -180,7 +205,7 @@ namespace MyWebAppApi.Repository
 
             if (!await read.ReadAsync()) return null;
 
-            return Convert.ToString(read["hashed_password"]);
+            return Convert.ToString(read["HashedPassword"]);
 
         }
 
@@ -188,7 +213,7 @@ namespace MyWebAppApi.Repository
         {
 
             string sql =
-                "Update auth.credentials  SET hashed_password = @password , password_changed_at = @now WHERE id = @id";
+                "Update Auth.Credentials  SET HashedPassword = @password , PasswordChangedAt = @now WHERE Id = @id";
             await using var conn = GetConnection();
 
             await using SqlCommand cmd = new SqlCommand(sql, conn);
@@ -209,7 +234,7 @@ namespace MyWebAppApi.Repository
 
         public async Task<bool> UploadImage(int id, byte[] imageBytes, string imagePath, string role)
         {
-                string sql = "UPDATE app.users SET profile_image = @img, profile_image_path = @path, profile_image_updated_at = GETDATE(),profile_image_updated_by = @role WHERE user_id = @id;";
+                string sql = "UPDATE App.Users SET ProfileImage = @img, ProfileImagePath = @path, ProfileImageUpdatedAt = GETDATE(),ProfileImageUpdatedBy = @role WHERE UserId = @id;";
                 await using var conn = GetConnection();
                 await using SqlCommand cmd = new SqlCommand(sql, conn);
                 cmd.Parameters.Add("@img", SqlDbType.VarBinary).Value = imageBytes;
@@ -226,7 +251,7 @@ namespace MyWebAppApi.Repository
         public async Task<IEnumerable<UsersViewDto>> GetAllUsers()
         {
             string sql =
-                "SELECT c.id,u.first_name,u.last_name,u.phone,c.role FROM app.users as u JOIN auth.credentials as c on u.user_id = c.id WHERE c.role != 'Admin'";
+                "SELECT c.Id,c.UserName,c.Role ,c.IsActive,u.FirstName,u.LastName,u.Phone,u.ProfileImagePath FROM App.Users as u JOIN Auth.Credentials as c on u.UserId = c.Id WHERE c.Role != 'Admin' AND IsDelete = 0";
 
             await using var conn = GetConnection();
 
@@ -243,11 +268,15 @@ namespace MyWebAppApi.Repository
             {
                 users.Add(new UsersViewDto
                 {
-                    Id = Convert.ToInt32(read["id"]),
-                    FirstName = Convert.ToString(read["first_name"]),
-                    LastName = Convert.ToString(read["last_name"]),
-                    Phone = Convert.ToString(read["phone"]),
-                    Role = Convert.ToString(read["role"])
+                    Id = Convert.ToInt32(read["Id"]),
+                    FirstName = Convert.ToString(read["FirstName"]),
+                    UserName = Convert.ToString(read["UserName"]),
+                    LastName = Convert.ToString(read["LastName"]),
+                    Phone = Convert.ToString(read["Phone"]),
+                    Role = Convert.ToString(read["Role"]),
+                    IsActive = Convert.ToBoolean(read["IsActive"]),
+                    ProfileImage = read["ProfileImagePath"] == DBNull.Value ? null : Convert.ToString(read["ProfileImagePath"])
+
                 });
             }
 
@@ -256,7 +285,7 @@ namespace MyWebAppApi.Repository
 
         public async Task<string?> GetImagePath(int id)
         {
-            string sql = "SELECT profile_image_path FROM app.users WHERE user_id = @id;";
+            string sql = "SELECT ProfileImagePath FROM app.Users WHERE UserId = @id;";
 
             await using var conn = GetConnection();
 
@@ -271,12 +300,12 @@ namespace MyWebAppApi.Repository
 
             if (!await read.ReadAsync()) return null;
 
-            return read["profile_image_path"] == DBNull.Value ? null : Convert.ToString(read["profile_image_path"]);
+            return read["ProfileImagePath"] == DBNull.Value ? null : Convert.ToString(read["ProfileImagePath"]);
         }
 
         public async Task<DbResponse?> DeleteUser(int id)
         {
-            string sql = "delete_user";
+            string sql = "Auth.DeleteUser";
 
             await using var conn = GetConnection();
 
@@ -301,5 +330,50 @@ namespace MyWebAppApi.Repository
 
 
         }
+
+        public async Task<bool> LockUser(int id)
+        {
+            string sql = "UPDATE Auth.Credentials SET IsActive = 0 , LockedAt = GETDATE() WHERE Id = @id";
+
+            await using var conn = GetConnection();
+            await using var cmd = new SqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("@id", id);
+
+
+            await conn.OpenAsync();
+            var result = await cmd.ExecuteNonQueryAsync();
+
+            return result > 0;
+
+        }
+
+        public async Task SaveLoginAttempt(int id)
+        {
+            const string sql = @"UPDATE Auth.Credentials SET LoginAttempts = LoginAttempts + 1 WHERE Id = @id;";
+
+            await using var conn = GetConnection();
+            await using var cmd = new SqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("@id", id);
+
+            await conn.OpenAsync();
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+        public async Task<bool> ToaggleStatus(int id)
+        {
+            const string sql = @"
+            UPDATE Auth.Credentials 
+            SET IsActive = CASE WHEN IsActive = 1 THEN 0 ELSE 1 END 
+            WHERE Id = @id;";
+
+            await using var conn = GetConnection();
+            await using var cmd = new SqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("@id", id);
+
+            await conn.OpenAsync();
+            int result = await cmd.ExecuteNonQueryAsync();
+            return result > 0;
+        }
+
     }
 }

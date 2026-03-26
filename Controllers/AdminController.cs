@@ -69,6 +69,13 @@ namespace MyWebAppApi.Controllers
             return Ok(response);
         }
 
+        [HttpPut("user/{id}/status")]
+        public async Task<IActionResult> ToaggleUserStatus(int id)
+        {
+            var response = await _adminService.ToaggleUserStatus(id);
+            return Ok(response);
+        }
+
 
     }
 }

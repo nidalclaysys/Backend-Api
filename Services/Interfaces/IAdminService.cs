@@ -7,6 +7,7 @@ namespace MyWebAppApi.Services.Interfaces
     {
         Task<ApiResponse<IEnumerable<UsersViewDto>>> GetAllUsers();
         Task<ApiResponse<string>> DeleteUser(int id);
+        Task<ApiResponse<string>> ToaggleUserStatus(int id);
 
     }
 }

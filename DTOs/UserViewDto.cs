@@ -6,28 +6,32 @@ namespace MyWebAppApi.DTOs
     public class UsersViewDto
     {
         [Required]
-        [Column("id")]
         public int Id { get; set; }
 
         [Required]
-        [Column("first_name")]
+        public string? UserName { get; set; }
+
+        [Required]
 
         public string? FirstName { get; set; }
 
         [Required]
-        [Column("last_name")]
 
         public string? LastName { get; set; }
 
+
         [Required]
-        [Column("phone")]
 
         public string? Phone { get; set; }
 
+        public string? ProfileImage { get; set; }
+
         [Required]
-        [Column("role")]
 
         public string? Role { get; set; }
+
+        public bool IsActive { get; set; }
+
     }
 
 }
