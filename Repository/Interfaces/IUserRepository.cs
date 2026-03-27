@@ -25,6 +25,9 @@ namespace MyWebAppApi.Repository.Interfaces
         Task SaveLoginAttempt(int id);
 
         Task<bool> ToaggleStatus(int id);
+
+        Task<IEnumerable<UsersViewDto>> GetAllBySearch(string search);
+
     }
 
 }

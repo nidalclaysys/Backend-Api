@@ -29,6 +29,16 @@ namespace MyWebAppApi.Controllers
             return Ok(users);
 
         }
+
+        [HttpGet("users/{search}")]
+        public async Task<IActionResult> GetAllUsers(string search)
+        {
+            var users = await _adminService.GetBySearch(search);
+
+            return Ok(users);
+
+        }
+
         [HttpGet("user/{id}")]
         public async Task<IActionResult> GetUserProfile(int id)
         {

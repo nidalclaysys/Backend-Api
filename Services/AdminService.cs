@@ -35,6 +35,26 @@ namespace MyWebAppApi.Services
             return ApiResponseBuilder.Success(users, "Retrived all users successfully");
         }
 
+        public async Task<ApiResponse<IEnumerable<UsersViewDto>>> GetBySearch(string search)
+        {
+            _logger.LogInformation("Fetching AllUsers data");
+
+            var role = _userFinder.GetRole();
+
+            if (role != "Admin")
+            {
+                _logger.LogWarning("Autharization revoked! for {role}", role);
+                return ApiResponseBuilder.Fail<IEnumerable<UsersViewDto>>("Forbidden", 403);
+            }
+
+            _logger.LogInformation("adimin try to search term on : {search}", search);
+
+            var users = await _userRepository.GetAllBySearch(search);
+            _logger.LogInformation("Retrived search result no users present :  {count}",users.Count());
+
+            return ApiResponseBuilder.Success(users, "Retrived search result successfully");
+        }
+
         public async Task<ApiResponse<string>> DeleteUser(int id)
         {
             _logger.LogInformation("operation started for remove user : {UserId}", id);

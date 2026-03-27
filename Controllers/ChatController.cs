@@ -58,17 +58,8 @@ namespace MvcApp.Controllers
         [HttpPost("file/{chatId}")]
         public async Task<IActionResult> SaveFile(int chatId,IFormFile file)
         {
-            if (file == null) return BadRequest("No file provided");
-
             var result = await _chatServices.UploadChatFile(chatId, file);
-
-            if (result.IsSuccess)
-            {
-                return Ok(result); 
-            }
-            return BadRequest(result.Message);
-
-
+             return Ok(result); 
         }
 
       

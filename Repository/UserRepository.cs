@@ -375,5 +375,41 @@ namespace MyWebAppApi.Repository
             return result > 0;
         }
 
+        public async Task<IEnumerable<UsersViewDto>> GetAllBySearch(string search)
+        {
+            string sql =
+                "SELECT c.Id,c.UserName,c.Role ,c.IsActive,u.FirstName,u.LastName,u.Phone,u.ProfileImagePath FROM App.Users as u JOIN Auth.Credentials as c on u.UserId = c.Id WHERE c.Role != 'Admin' AND (LOWER(FirstName) LIKE LOWER(@search) OR LOWER(LastName) LIKE LOWER(@search));";
+
+            await using var conn = GetConnection();
+
+            await using SqlCommand cmd = new SqlCommand(sql, conn);
+
+            await conn.OpenAsync();
+
+            cmd.Parameters.AddWithValue("@search", $"%{search}%");
+
+            await using var read = await cmd.ExecuteReaderAsync();
+
+            List<UsersViewDto> users = new List<UsersViewDto>();
+
+            while (await read.ReadAsync())
+            {
+                users.Add(new UsersViewDto
+                {
+                    Id = Convert.ToInt32(read["Id"]),
+                    FirstName = Convert.ToString(read["FirstName"]),
+                    UserName = Convert.ToString(read["UserName"]),
+                    LastName = Convert.ToString(read["LastName"]),
+                    Phone = Convert.ToString(read["Phone"]),
+                    Role = Convert.ToString(read["Role"]),
+                    IsActive = Convert.ToBoolean(read["IsActive"]),
+                    ProfileImage = read["ProfileImagePath"] == DBNull.Value ? null : Convert.ToString(read["ProfileImagePath"])
+
+                });
+            }
+
+            return users;
+        }
+
     }
 }
